@@ -1,0 +1,11 @@
+#!/bin/bash
+
+SRC=(tests/main.cpp tar.cpp)
+
+OUT_DIR=out
+OUT=$OUT_DIR/tar_tests
+
+mkdir -p $OUT_DIR
+
+clang++ `python .ycm_extra_conf.py compile-flags` ${SRC[*]} -o $OUT
+
