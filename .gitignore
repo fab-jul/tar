@@ -1,0 +1,6 @@
+*.pyc
+out/
+
+# OS X related file
+Icon
+
