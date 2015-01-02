@@ -19,15 +19,15 @@ namespace tar
         const int FILE_NAME_LENGTH = 100;
 
         // From http://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
-        typedef enum 
+        typedef enum
         {
-                tar_file_type_normal = 0,              
-                tar_file_type_hard_link = 1,                  
+                tar_file_type_normal = 0,
+                tar_file_type_hard_link = 1,
                 tar_file_type_soft_link = 2,
-                tar_file_type_directory = 5                  
+                tar_file_type_directory = 5
         } tar_file_type;
 
-        struct tar_header                
+        struct tar_header
         {
                 char name[FILE_NAME_LENGTH];  // file name
                 char mode[8];                 // file mode
@@ -106,7 +106,7 @@ namespace tar
                 size_t len = std::strlen(file_name);
 
                 // len > 0 also ensures that the header does not start with \0
-                if (len == 0 || len >= FILE_NAME_LENGTH)  
+                if (len == 0 || len >= FILE_NAME_LENGTH)
                 {
                         LOG("Invalid file name for tar: %s", file_name);
                         std::sprintf(header->name, "INVALID_%d", std::rand());
@@ -161,7 +161,7 @@ namespace tar
                 fill(dst, data_size);
         }
 
-        /* The end of an tar is marked by at least two consecutive zero-filled 
+        /* The end of an tar is marked by at least two consecutive zero-filled
          * records, a record having the size of the header. */
         void finish(std::ostream& dst)
         {
@@ -208,16 +208,8 @@ namespace tar
                 return true;
         }
 
-        void getNextFileData(std::istream& inp,
-                             char * const data,
-                             const file_size_t file_size)
+        void _seek_to_next_header(std::istream& inp)
         {
-                if (data == NULL)  // NULL gets passed from skip()
-                        // seek |file_size| bytes from CURrent position, to skip
-                        inp.seekg(file_size, std::ios::cur);  
-                else
-                        inp.read(data, file_size);
-
                 // Advance to start of next header or to end of file
                 // Works because
                 // - header never starts with FILL_CHAR
@@ -227,9 +219,19 @@ namespace tar
                         inp.get();
         }
 
+        void getNextFileData(std::istream& inp,
+                             char * const data,
+                             const file_size_t file_size)
+        {
+                inp.read(data, file_size);
+                _seek_to_next_header(inp);
+        }
+
         void skip(std::istream& inp, const file_size_t file_size)
         {
-                getNextFileData(inp, NULL, file_size);
+                                            // CURrent position, to skip
+                inp.seekg(file_size, std::ios::cur);
+                _seek_to_next_header(inp);
         }
 
 }  // namespace tar

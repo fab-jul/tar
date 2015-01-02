@@ -12,7 +12,7 @@ namespace tar
         // Writing raw data
         ////////////////////////////////////////
 
-        // Append the data specified by |data| and |file_size| into the tar 
+        // Append the data specified by |data| and |file_size| into the tar
         // file represented by |dst|.
         // In the tar file, the data will be available at |path_in_tar|.
         void put(std::ostream& dst,
