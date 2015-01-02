@@ -31,12 +31,12 @@ namespace tar
         // - the path in the tar (note: is at most FILE_NAME_LENGTH chars long)
         // - the size in bytes
         // Returns false if reading fails
-        bool getNextFileInfo(std::istream& inp,
+        bool get_next_file_info(std::istream& inp,
                              char * path_in_tar,
                              file_size_t * file_size);
 
         // Reads data of size |file_size| of the next file into |data|.
-        void getNextFileData(std::istream& inp,
+        void get_next_file_data(std::istream& inp,
                              char * const data, const file_size_t file_size);
 
         // Skips the current file of size |file_size|.

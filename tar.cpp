@@ -49,7 +49,7 @@ namespace tar
                 char pad[12];                 // padding
         };
 
-        void header_setMetadata(tar_header* header)
+        void header_set_metadata(tar_header* header)
         {
                 std::memset(header, 0, sizeof(tar_header));
 
@@ -65,7 +65,7 @@ namespace tar
         /* From Wikipedia: The checksum is calculated by taking the sum of the
          * unsigned byte values of the header record with the eight checksum
          * bytes taken to be ascii spaces. */
-        void header_setChecksum(tar_header* header)
+        void header_set_checksum(tar_header* header)
         {
                 unsigned int sum = 0;
 
@@ -91,17 +91,17 @@ namespace tar
                 std::sprintf(header->checksum, "%06o", sum);
         }
 
-        void header_setFilesize(tar_header* header, file_size_t file_size)
+        void header_set_filesize(tar_header* header, file_size_t file_size)
         {
                 std::sprintf(header->size, "%011llo", file_size);
         }
 
-        void header_getFilesize(tar_header* header, file_size_t* file_size)
+        void header_get_filesize(tar_header* header, file_size_t* file_size)
         {
                 std::sscanf(header->size, "%011llo", file_size);
         }
 
-        void header_setFilename(tar_header* header, const char* file_name)
+        void header_set_filename(tar_header* header, const char* file_name)
         {
                 size_t len = std::strlen(file_name);
 
@@ -117,33 +117,35 @@ namespace tar
                 }
         }
 
-        void header_getFilename(tar_header* header, char* file_name)
+        void header_get_filename(tar_header* header, char* file_name)
         {
                 std::sscanf(header->name, "%s", file_name);
         }
 
+        ////////////////////////////////////////
+
         /* Every file in a tar file starts with the tar header */
-        void writeHeader(std::ostream& dst,
-                        const char* file_name,
-                        file_size_t file_size)
+        void _write_header(std::ostream& dst,
+                           const char* file_name,
+                           file_size_t file_size)
         {
                 tar_header header;
-                header_setMetadata(&header);
-                header_setFilename(&header, file_name);
-                header_setFilesize(&header, file_size);
-                header_setChecksum(&header);
+                header_set_metadata(&header);
+                header_set_filename(&header, file_name);
+                header_set_filesize(&header, file_size);
+                header_set_checksum(&header);
 
                 dst.write((const char*)&header, sizeof(tar_header));
         }
 
-        void readHeader(std::istream& inp, tar_header* header)
+        void _read_header(std::istream& inp, tar_header* header)
         {
                 inp.read((char*)header, sizeof(tar_header));
         }
 
         /* The length of the data after the header must be rounded up to a
            multiple of 512 bytes, the length of the header. */
-        void fill(std::ostream& dst, unsigned long file_size)
+        void _fill(std::ostream& dst, unsigned long file_size)
         {
                 while (file_size % sizeof(tar_header) != 0)
                 {
@@ -156,9 +158,9 @@ namespace tar
                  char const * const path_in_tar,
                  char const * const data, const file_size_t data_size)
         {
-                writeHeader(dst, path_in_tar, data_size);
+                _write_header(dst, path_in_tar, data_size);
                 dst.write(data, data_size);
-                fill(dst, data_size);
+                _fill(dst, data_size);
         }
 
         /* The end of an tar is marked by at least two consecutive zero-filled
@@ -173,7 +175,7 @@ namespace tar
                 }
         }
 
-        bool checkIfHeaderIsNext(std::istream& inp)
+        bool _check_if_header_is_next(std::istream& inp)
         {
                 if (inp.eof() || inp.peek() == EOF)
                 {
@@ -192,18 +194,18 @@ namespace tar
                 return true;
         }
 
-        bool getNextFileInfo(std::istream& inp,
-                             char* path_in_tar,
-                             file_size_t* file_size)
+        bool get_next_file_info(std::istream& inp,
+                                char* path_in_tar,
+                                file_size_t* file_size)
         {
-                if (!checkIfHeaderIsNext(inp))
+                if (!_check_if_header_is_next(inp))
                         return false;
 
                 tar_header header;
-                readHeader(inp, &header);
+                _read_header(inp, &header);
 
-                header_getFilesize(&header, file_size);
-                header_getFilename(&header, path_in_tar);
+                header_get_filesize(&header, file_size);
+                header_get_filename(&header, path_in_tar);
 
                 return true;
         }
@@ -219,9 +221,9 @@ namespace tar
                         inp.get();
         }
 
-        void getNextFileData(std::istream& inp,
-                             char * const data,
-                             const file_size_t file_size)
+        void get_next_file_data(std::istream& inp,
+                                char * const data,
+                                const file_size_t file_size)
         {
                 inp.read(data, file_size);
                 _seek_to_next_header(inp);
