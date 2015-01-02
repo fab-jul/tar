@@ -18,17 +18,26 @@ namespace tar
         const char FILL_CHAR = '\0';
         const int FILE_NAME_LENGTH = 100;
 
-        struct tar_header                // From http://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
+        // From http://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
+        typedef enum 
+        {
+                tar_file_type_normal = 0,              
+                tar_file_type_hard_link = 1,                  
+                tar_file_type_soft_link = 2,
+                tar_file_type_directory = 5                  
+        } tar_file_type;
+
+        struct tar_header                
         {
                 char name[FILE_NAME_LENGTH];  // file name
                 char mode[8];                 // file mode
                 char uid[8];                  // Owner's numeric user ID
                 char gid[8];                  // Group's numeric user ID
                 char size[12];                // File size in bytes (octal base)
-                char mtime[12];               // Last modification time in numeric Unix time format (octal)
+                char mtime[12];               // Last modification time in
+                                              // numeric Unix time format (octal)
                 char checksum[8];             // Checksum for header record
-                char typeflag[1];             // Link indicator (file type)
-                // 0 normal file, 1 hard link, 2 soft link
+                char typeflag[1];             // file type, see tar_file_type
                 char linkname[100];           // Name of linked file
                 char magic[6];                // UStar indicator "ustar"
                 char version[2];              // UStar version "00"
@@ -37,7 +46,7 @@ namespace tar
                 char devmajor[8];             // Device major number
                 char devminor[8];             // Device minor number
                 char prefix[155];             // Filename prefix
-                char pad[12];
+                char pad[12];                 // padding
         };
 
         void header_setMetadata(tar_header* header)
@@ -53,10 +62,11 @@ namespace tar
                 header->typeflag[0] = 0;  // always just a normal file
         }
 
+        /* From Wikipedia: The checksum is calculated by taking the sum of the
+         * unsigned byte values of the header record with the eight checksum
+         * bytes taken to be ascii spaces. */
         void header_setChecksum(tar_header* header)
         {
-                /* From Wikipedia: The checksum is calculated by taking the sum of the unsigned byte values
-                   of the header record with the eight checksum bytes taken to be ascii spaces. */
                 unsigned int sum = 0;
 
                 char *pointer = (char *) header;
@@ -94,7 +104,9 @@ namespace tar
         void header_setFilename(tar_header* header, const char* fileName)
         {
                 size_t len = std::strlen(fileName);
-                if (len == 0 || len >= FILE_NAME_LENGTH)  // len > 0 also ensures that the header does not start with \0
+
+                // len > 0 also ensures that the header does not start with \0
+                if (len == 0 || len >= FILE_NAME_LENGTH)  
                 {
                         LOG("Invalid file name for tar: %s", fileName);
                         std::sprintf(header->name, "INVALID_%d", std::rand());
@@ -110,7 +122,7 @@ namespace tar
                 std::sscanf(header->name, "%s", fileName);
         }
 
-        /* In front of the data of every file there is this header. */
+        /* Every file in a tar file starts with the tar header */
         void writeHeader(std::ostream& dst, const char* fileName, file_size_t fileSize)
         {
                 tar_header header;
@@ -139,18 +151,19 @@ namespace tar
         }
 
         void put(std::ostream& dst,
-                        const char * const pathInTar,
-                        char const * const dataBegin, const file_size_t fileSize)
+                 const char * const pathInTar,
+                 char const * const dataBegin,
+                 const file_size_t fileSize)
         {
                 writeHeader(dst, pathInTar, fileSize);
                 dst.write(dataBegin, fileSize);
                 fill(dst, fileSize);
         }
 
+        /* The end of an tar is marked by at least two consecutive zero-filled 
+         * records, a record having the size of the header. */
         void finish(std::ostream& dst)
         {
-                /* The end of an tar is marked by at least two consecutive zero-filled records,
-                   a record having the size of the header. */
                 unsigned long i = 0;
                 while (i < 2 * sizeof(tar_header))
                 {
@@ -169,7 +182,9 @@ namespace tar
 
                 if (inp.peek() == FILL_CHAR)
                 {
-                        LOG("Can not read next file info, istream is pointing to %d, which a tar header can not start with.", FILL_CHAR);
+                        LOG("Can not read next file info, istream is pointing"
+                            "to %d, which a tar header can not start with.",
+                            FILL_CHAR);
                         return false;
                 }
 
@@ -196,10 +211,11 @@ namespace tar
                              char * const data,
                              const file_size_t fileSize)
         {
-                if (data != NULL)  // NULL gets passed from skip
-                        inp.read(data, fileSize);
+                if (data == NULL)  // NULL gets passed from skip()
+                        // seek |fileSize| bytes from CURrent position, to skip
+                        inp.seekg(fileSize, std::ios::cur);  
                 else
-                        inp.seekg(fileSize, std::ios::cur);  // seek |fileSize| bytes from CURrent position
+                        inp.read(data, fileSize);
 
                 // Advance to start of next header or to end of file
                 // Works because
