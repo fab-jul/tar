@@ -4,6 +4,7 @@
 #include <cstdio>   // for sprintf, snprintf and sscanf
 #include <cstdlib>  // for rand
 #include <ctime>    // for time
+#include <cassert>
 
 #define ENABLE_LOGGING
 
@@ -108,7 +109,7 @@ namespace tar
                 // len > 0 also ensures that the header does not start with \0
                 if (len == 0 || len >= FILE_NAME_LENGTH)
                 {
-                        LOG("Invalid file name for tar: %s", file_name);
+                        LOG("Invalid file name for tar: %s\n", file_name);
                         std::sprintf(header->name, "INVALID_%d", std::rand());
                 }
                 else
@@ -153,59 +154,21 @@ namespace tar
                         file_size++;
                 }
         }
-
-        void put(std::ostream& dst,
-                 char const * const path_in_tar,
-                 char const * const data, const file_size_t data_size)
-        {
-                _write_header(dst, path_in_tar, data_size);
-                dst.write(data, data_size);
-                _fill(dst, data_size);
-        }
-
-        /* The end of an tar is marked by at least two consecutive zero-filled
-         * records, a record having the size of the header. */
-        void finish(std::ostream& dst)
-        {
-                unsigned long i = 0;
-                while (i < 2 * sizeof(tar_header))
-                {
-                        dst.put(FILL_CHAR);
-                        i++;
-                }
-        }
-
         bool _check_if_header_is_next(std::istream& inp)
         {
                 if (inp.eof() || inp.peek() == EOF)
                 {
-                        LOG("Can not read next file info, istream is at EOF.");
+                        LOG("Can not read next file info, istream at EOF.\n");
                         return false;
                 }
 
                 if (inp.peek() == FILL_CHAR)
                 {
-                        LOG("Can not read next file info, istream is pointing"
-                            "to %d, which a tar header can not start with.",
+                        LOG("Can not read next file info, istream is pointing "
+                            "to %d, which a tar header can not start with.\n",
                             FILL_CHAR);
                         return false;
                 }
-
-                return true;
-        }
-
-        bool get_next_file_info(std::istream& inp,
-                                char* path_in_tar,
-                                file_size_t* file_size)
-        {
-                if (!_check_if_header_is_next(inp))
-                        return false;
-
-                tar_header header;
-                _read_header(inp, &header);
-
-                header_get_filesize(&header, file_size);
-                header_get_filename(&header, path_in_tar);
 
                 return true;
         }
@@ -221,19 +184,95 @@ namespace tar
                         inp.get();
         }
 
-        void get_next_file_data(std::istream& inp,
-                                char * const data,
-                                const file_size_t file_size)
+        ////////////////////////////////////////
+        // writer Implementation
+        ////////////////////////////////////////
+
+        void writer::put(std::string path_in_tar,
+                         char const * const data, const file_size_t data_size)
         {
-                inp.read(data, file_size);
-                _seek_to_next_header(inp);
+                tar::_write_header(_dst, path_in_tar.c_str(), data_size);
+                _dst.write(data, data_size);
+                _fill(_dst, data_size);
         }
 
-        void skip(std::istream& inp, const file_size_t file_size)
+        /* The end of an tar is marked by at least two consecutive zero-filled
+         * records, a record having the size of the header. */
+        void writer::finish()
         {
-                                            // CURrent position, to skip
-                inp.seekg(file_size, std::ios::cur);
-                _seek_to_next_header(inp);
+                unsigned long i = 0;
+                while (i < 2 * sizeof(tar_header))
+                {
+                        _dst.put(FILL_CHAR);
+                        i++;
+                }
+        }
+
+        ////////////////////////////////////////
+        // reader Implementation
+        ////////////////////////////////////////
+
+        bool reader::contains_another_file()
+        {
+                return _next_header != NULL
+                    || tar::_check_if_header_is_next(_inp);
+        }
+
+        void reader::_read_header()
+        {
+                if (_next_header == NULL) {
+                        assert(_check_if_header_is_next());
+
+                        _next_header = new tar_header();
+                        tar::_read_header(_inp, _next_header);
+                }
+        }
+
+        std::string reader::get_next_file_name()
+        {
+                _read_header();
+                return std::string(_next_header -> name);
+        }
+
+        file_size_t reader::get_next_file_size()
+        {
+                _read_header();
+                file_size_t file_size;
+                tar::header_get_filesize(_next_header, &file_size);
+                return file_size;
+        }
+
+        void reader::read_next_file(char * const data)
+        {
+                _inp.read(data, get_next_file_size());
+
+                delete _next_header;
+                _next_header = NULL;
+                tar::_seek_to_next_header(_inp);
+        }
+
+        void reader::skip_next_file()
+        {
+                _inp.seekg(get_next_file_size(), std::ios::cur);
+
+                delete _next_header;
+                _next_header = NULL;
+                tar::_seek_to_next_header(_inp);
+        }
+
+        int reader::number_of_files() {
+                std::streampos pos = _inp.tellg();
+                _inp.seekg(0, std::ios::beg);
+
+                int number_of_files = 0;
+                while (contains_another_file()) {
+                        number_of_files++;
+                        skip_next_file();
+                }
+
+                _inp.seekg(pos);
+
+                return number_of_files;
         }
 
 }  // namespace tar
