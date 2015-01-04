@@ -38,7 +38,8 @@ namespace tar
         class reader {
                 std::istream& _inp;
                 tar_header* _next_header;
-                void _read_header();
+                void _set_next_header();
+                void _discard_next_header();
         public:
                 // Constructor, pass input stream |inp| pointing to a tar file.
                 reader(std::istream& inp) : _inp(inp), _next_header(NULL) {}

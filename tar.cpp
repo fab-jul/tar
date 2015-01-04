@@ -218,7 +218,7 @@ namespace tar
                     || tar::_check_if_header_is_next(_inp);
         }
 
-        void reader::_read_header()
+        void reader::_set_next_header()
         {
                 if (_next_header == NULL) {
                         assert(_check_if_header_is_next());
@@ -228,15 +228,21 @@ namespace tar
                 }
         }
 
+        void reader::_discard_next_header()
+        {
+                delete _next_header;
+                _next_header = NULL;
+        }
+
         std::string reader::get_next_file_name()
         {
-                _read_header();
+                _set_next_header();
                 return std::string(_next_header -> name);
         }
 
         file_size_t reader::get_next_file_size()
         {
-                _read_header();
+                _set_next_header();
                 file_size_t file_size;
                 tar::header_get_filesize(_next_header, &file_size);
                 return file_size;
@@ -246,8 +252,7 @@ namespace tar
         {
                 _inp.read(data, get_next_file_size());
 
-                delete _next_header;
-                _next_header = NULL;
+                _discard_next_header();
                 tar::_seek_to_next_header(_inp);
         }
 
@@ -255,13 +260,12 @@ namespace tar
         {
                 _inp.seekg(get_next_file_size(), std::ios::cur);
 
-                delete _next_header;
-                _next_header = NULL;
+                _discard_next_header();
                 tar::_seek_to_next_header(_inp);
         }
 
         int reader::number_of_files() {
-                std::streampos pos = _inp.tellg();
+                std::streampos current_position = _inp.tellg();
                 _inp.seekg(0, std::ios::beg);
 
                 int number_of_files = 0;
@@ -270,7 +274,7 @@ namespace tar
                         skip_next_file();
                 }
 
-                _inp.seekg(pos);
+                _inp.seekg(current_position);
 
                 return number_of_files;
         }
