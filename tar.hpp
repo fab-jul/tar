@@ -8,7 +8,6 @@ namespace tar
 {
         typedef long long unsigned file_size_t;
         extern const int FILE_NAME_LENGTH;
-        struct tar_header;
 
         ////////////////////////////////////////
         // Writing raw data
@@ -26,23 +25,30 @@ namespace tar
                          char const * const data,
                          const file_size_t data_size);
 
-                // Call after everything has been added to the tar represented 
+                // Call after everything has been added to the tar represented
                 // by |dst| to make it a valid tar file.
                 void finish();
         };
-
 
         ////////////////////////////////////////
         // Reading raw data
         ////////////////////////////////////////
         class reader {
                 std::istream& _inp;
-                tar_header* _next_header;
-                void _set_next_header();
-                void _discard_next_header();
+                struct  {
+                        std::string file_name;
+                        file_size_t file_size;
+                } _cached_header_data;
+                bool _cached_header_data_valid;
+                void _cache_header();
+                int _number_of_files;
+
         public:
                 // Constructor, pass input stream |inp| pointing to a tar file.
-                reader(std::istream& inp) : _inp(inp), _next_header(NULL) {}
+                reader(std::istream& inp)
+                : _inp(inp)
+                , _cached_header_data_valid(false)
+                , _number_of_files(-1) {}
 
                 // Returns true iff another file can be read from |inp|.
                 bool contains_another_file();

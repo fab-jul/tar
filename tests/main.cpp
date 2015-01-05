@@ -12,13 +12,15 @@ int main() {
         return 0;
 }
 
-void _tassert(bool condition, std::string condition_str)
+bool _tassert(bool condition, std::string condition_str)
 {
         if (!(condition)) {
                 std::cout << "FAILED: " << condition_str << std::endl;
         } else {
                 std::cout << "PASSED: " << condition_str << std::endl;
         }
+
+        return condition;
 }
 
 #define tassert(_COND_) _tassert(_COND_, #_COND_)

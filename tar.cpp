@@ -97,9 +97,11 @@ namespace tar
                 std::sprintf(header->size, "%011llo", file_size);
         }
 
-        void header_get_filesize(tar_header* header, file_size_t* file_size)
+        file_size_t header_get_filesize(tar_header* header)
         {
-                std::sscanf(header->size, "%011llo", file_size);
+                file_size_t file_size;
+                std::sscanf(header->size, "%011llo", &file_size);
+                return file_size;
         }
 
         void header_set_filename(tar_header* header, const char* file_name)
@@ -118,9 +120,9 @@ namespace tar
                 }
         }
 
-        void header_get_filename(tar_header* header, char* file_name)
+        std::string header_get_filename(tar_header* header)
         {
-                std::sscanf(header->name, "%s", file_name);
+                return std::string(header->name);
         }
 
         ////////////////////////////////////////
@@ -214,45 +216,40 @@ namespace tar
 
         bool reader::contains_another_file()
         {
-                return _next_header != NULL
-                    || tar::_check_if_header_is_next(_inp);
+                return tar::_check_if_header_is_next(_inp);
         }
 
-        void reader::_set_next_header()
+        void reader::_cache_header()
         {
-                if (_next_header == NULL) {
-                        assert(_check_if_header_is_next());
+                if (_cached_header_data_valid) return;
 
-                        _next_header = new tar_header();
-                        tar::_read_header(_inp, _next_header);
-                }
-        }
+                assert(contains_another_file());
 
-        void reader::_discard_next_header()
-        {
-                delete _next_header;
-                _next_header = NULL;
+                tar_header h;
+                tar::_read_header(_inp, &h);
+
+                _cached_header_data.file_name = tar::header_get_filename(&h);
+                _cached_header_data.file_size = tar::header_get_filesize(&h);
+                _cached_header_data_valid = true;
         }
 
         std::string reader::get_next_file_name()
         {
-                _set_next_header();
-                return std::string(_next_header -> name);
+                _cache_header();
+                return _cached_header_data.file_name;
         }
 
         file_size_t reader::get_next_file_size()
         {
-                _set_next_header();
-                file_size_t file_size;
-                tar::header_get_filesize(_next_header, &file_size);
-                return file_size;
+                _cache_header();
+                return _cached_header_data.file_size;
         }
 
         void reader::read_next_file(char * const data)
         {
                 _inp.read(data, get_next_file_size());
 
-                _discard_next_header();
+                _cached_header_data_valid = false;
                 tar::_seek_to_next_header(_inp);
         }
 
@@ -260,23 +257,25 @@ namespace tar
         {
                 _inp.seekg(get_next_file_size(), std::ios::cur);
 
-                _discard_next_header();
+                _cached_header_data_valid = false;
                 tar::_seek_to_next_header(_inp);
         }
 
         int reader::number_of_files() {
-                std::streampos current_position = _inp.tellg();
-                _inp.seekg(0, std::ios::beg);
+                if (_number_of_files == -1) {
+                        std::streampos current_position = _inp.tellg();
+                        _inp.seekg(0, std::ios::beg);
 
-                int number_of_files = 0;
-                while (contains_another_file()) {
-                        number_of_files++;
-                        skip_next_file();
+                        _number_of_files = 0;
+                        while (contains_another_file()) {
+                                _number_of_files++;
+                                skip_next_file();
+                        }
+
+                        _inp.seekg(current_position);
                 }
 
-                _inp.seekg(current_position);
-
-                return number_of_files;
+                return _number_of_files;
         }
 
 }  // namespace tar
