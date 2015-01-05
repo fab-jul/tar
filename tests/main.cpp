@@ -4,11 +4,13 @@
 #include <fstream>
 
 void test_tar_lib();
+void test_folders();
 void test_streq();
 
 int main() {
         test_streq();
         test_tar_lib();
+        test_folders();
         return 0;
 }
 
@@ -61,7 +63,7 @@ void test_tar_lib()
         }
         long_string[LONG_STRING_LENGTH - 1] = '\n';
 
-        w.put("long.txt", long_string, LONG_STRING_LENGTH);
+        w.put("folder/long.txt", long_string, LONG_STRING_LENGTH);
         w.finish();
         o.close();
 
@@ -90,7 +92,7 @@ void test_tar_lib()
         // test whether seeking works
         tassert(r.number_of_files() == 2);
 
-        tassert(r.get_next_file_name() == "long.txt");
+        tassert(r.get_next_file_name() == "folder/long.txt");
 
         size = r.get_next_file_size();
         tassert(size == LONG_STRING_LENGTH);
@@ -102,5 +104,14 @@ void test_tar_lib()
         free(target);
 
         tassert(r.contains_another_file() == false);
+}
+
+void test_folders()
+{
+        std::ofstream o("folder_test.tar", std::ios::out | std::ios::binary);
+        tar::writer w(o);
+
+        w.put_directory("test_folder");
+        w.finish();
 }
 
