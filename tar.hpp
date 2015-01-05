@@ -25,6 +25,11 @@ namespace tar
                          char const * const data,
                          const file_size_t data_size);
 
+                // Write empty folder at |path_in_tar|.
+                // NOTE: to specify folders for files, just use / in the path
+                //       passed to |put()|.
+                void put_directory(std::string path_in_tar);
+
                 // Call after everything has been added to the tar represented
                 // by |dst| to make it a valid tar file.
                 void finish();

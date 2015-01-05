@@ -20,13 +20,13 @@ namespace tar
         const int FILE_NAME_LENGTH = 100;
 
         // From http://en.wikipedia.org/wiki/Tar_(computing)#UStar_format
-        typedef enum
+        typedef enum tar_file_type
         {
-                tar_file_type_normal = 0,
-                tar_file_type_hard_link = 1,
-                tar_file_type_soft_link = 2,
-                tar_file_type_directory = 5
-        } tar_file_type;
+                tar_file_type_normal    = '0',
+                tar_file_type_hard_link = '1',
+                tar_file_type_soft_link = '2',
+                tar_file_type_directory = '5'
+        } tar_file_type_t;
 
         struct tar_header
         {
@@ -38,7 +38,7 @@ namespace tar
                 char mtime[12];               // Last modification time in
                                               // numeric Unix time format (octal)
                 char checksum[8];             // Checksum for header record
-                char typeflag[1];             // file type, see tar_file_type
+                char typeflag[1];             // file type, see tar_file_type_t
                 char linkname[100];           // Name of linked file
                 char magic[6];                // UStar indicator "ustar"
                 char version[2];              // UStar version "00"
@@ -92,6 +92,16 @@ namespace tar
                 std::sprintf(header->checksum, "%06o", sum);
         }
 
+        void header_set_filetype(tar_header* header, tar_file_type_t file_type)
+        {
+                std::sprintf(header->typeflag, "%c", file_type);
+        }
+
+        tar_file_type_t header_get_filetype(tar_header* header)
+        {
+                return tar_file_type_t(header->typeflag[0]);
+        }
+
         void header_set_filesize(tar_header* header, file_size_t file_size)
         {
                 std::sprintf(header->size, "%011llo", file_size);
@@ -130,12 +140,14 @@ namespace tar
         /* Every file in a tar file starts with the tar header */
         void _write_header(std::ostream& dst,
                            const char* file_name,
-                           file_size_t file_size)
+                           file_size_t file_size,
+                           tar_file_type_t file_type = tar_file_type_normal)
         {
                 tar_header header;
                 header_set_metadata(&header);
                 header_set_filename(&header, file_name);
                 header_set_filesize(&header, file_size);
+                header_set_filetype(&header, file_type);
                 header_set_checksum(&header);
 
                 dst.write((const char*)&header, sizeof(tar_header));
@@ -196,6 +208,12 @@ namespace tar
                 tar::_write_header(_dst, path_in_tar.c_str(), data_size);
                 _dst.write(data, data_size);
                 _fill(_dst, data_size);
+        }
+
+        void writer::put_directory(std::string path_in_tar)
+        {
+                tar::_write_header(_dst, path_in_tar.c_str(), 0,
+                                   tar_file_type_directory);
         }
 
         /* The end of an tar is marked by at least two consecutive zero-filled
